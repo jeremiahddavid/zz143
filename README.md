@@ -75,15 +75,20 @@ action               sequences            known sequence      learned params
 
 ## Quick start
 
-> zz143 is not published to Maven Central yet. To try it, clone this repo and use the demo app, or add the modules as local project dependencies.
+### 1. Add the dependency
 
-### 1. Clone and build
+```kotlin
+// build.gradle.kts
+repositories {
+    mavenCentral()
+}
 
-```bash
-git clone https://github.com/jeremiahddavid/zz143.git
-cd zz143
-./gradlew assembleDebug
+dependencies {
+    implementation("io.github.jeremiahddavid:zz143-android:0.1.0")
+}
 ```
+
+> **Note:** If the Maven Central artifact is not yet available, clone this repo and use `./gradlew publishToMavenLocal` to install locally, then add `mavenLocal()` to your repositories.
 
 ### 2. Initialize in your Application
 
@@ -220,7 +225,7 @@ To run the demo: `./gradlew :demo-app:installDebug`
 This is alpha software. Be aware of:
 
 - **Manual tracking required.** You must call `ZZ143.trackAction()` at every step. There is no automatic UI interaction capture.
-- **Not published to Maven.** Must be used as local project dependency or built from source.
+- **Maven Central publish pending.** The publishing infrastructure is set up (`io.github.jeremiahddavid` namespace verified on Sonatype Central). Use `mavenLocal()` for now if the artifact isn't yet on Maven Central.
 - **Minimally tested.** Verified on one emulator (API 36). No production testing. No performance benchmarks.
 - **Kotlin/Java only.** No Flutter, React Native, or Xamarin support yet. The core SDK is Kotlin — cross-framework wrappers are on the roadmap but depend on community demand.
 - **No iOS SDK.** Android only for now.

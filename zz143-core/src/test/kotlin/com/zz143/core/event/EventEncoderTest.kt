@@ -237,7 +237,9 @@ class EventEncoderTest {
         val event = lifecycleEvent(type = LifecycleType.SESSION_START)
         val bytes = encoder.encode(event)
 
-        val lifecycleTagIndex = bytes.indexOfFirst { it == EventEncoder.TAG_LIFECYCLE }
+        // Search from end — TAG_LIFECYCLE is near the end, before TAG_END
+        val lifecycleTagIndex = bytes.indexOfLast { it == EventEncoder.TAG_LIFECYCLE }
+        assertThat(lifecycleTagIndex).isGreaterThan(-1)
         assertThat(bytes[lifecycleTagIndex + 1].toInt()).isEqualTo(LifecycleType.SESSION_START.ordinal)
     }
 
@@ -246,7 +248,8 @@ class EventEncoderTest {
         val event = lifecycleEvent(type = LifecycleType.APP_BACKGROUNDED)
         val bytes = encoder.encode(event)
 
-        val lifecycleTagIndex = bytes.indexOfFirst { it == EventEncoder.TAG_LIFECYCLE }
+        val lifecycleTagIndex = bytes.indexOfLast { it == EventEncoder.TAG_LIFECYCLE }
+        assertThat(lifecycleTagIndex).isGreaterThan(-1)
         assertThat(bytes[lifecycleTagIndex + 1].toInt()).isEqualTo(LifecycleType.APP_BACKGROUNDED.ordinal)
     }
 

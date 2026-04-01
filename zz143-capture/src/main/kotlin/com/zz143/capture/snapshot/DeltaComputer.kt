@@ -34,6 +34,7 @@ internal class DeltaComputer {
             // Skip subtree comparison if structural hash matches
             if (currNode.structuralHash == prevNode.structuralHash &&
                 currNode.text == prevNode.text &&
+                currNode.contentDescription == prevNode.contentDescription &&
                 currNode.isVisible == prevNode.isVisible &&
                 currNode.isEnabled == prevNode.isEnabled &&
                 currNode.isFocused == prevNode.isFocused &&

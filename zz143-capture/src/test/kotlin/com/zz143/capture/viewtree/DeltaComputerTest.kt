@@ -5,8 +5,8 @@ import com.zz143.capture.snapshot.DeltaComputer
 import com.zz143.core.model.ElementId
 import com.zz143.core.model.Mutation
 import com.zz143.core.model.Rect
-import com.zz143.core.testutil.ViewNodeBuilder
-import com.zz143.core.testutil.viewNode
+import com.zz143.capture.viewtree.ViewNodeBuilder
+import com.zz143.capture.viewtree.viewNode
 import org.junit.Before
 import org.junit.Test
 

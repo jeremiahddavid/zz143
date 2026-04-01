@@ -12,6 +12,7 @@ class DemoApplication : Application() {
             suggestionsEnabled(true)
             suggestionDisplayType(SuggestionDisplayType.BOTTOM_SHEET)
             minPatternOccurrences(3)
+            patternAnalysisIntervalMs(5_000L)
             captureTextValues(false)
             debugLogging(true)
         }

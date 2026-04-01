@@ -272,8 +272,8 @@ object ZZ143 {
                     suggestionId = UlidGenerator.next(),
                     workflow = workflow,
                     displayType = _config.suggestionDisplayType,
-                    title = "Complete '${workflow.name}'?",
-                    description = "$remaining steps remaining — save ~${remaining * 3}s",
+                    title = workflow.name + "?",
+                    description = workflow.description,
                     estimatedTimeSavedMs = remaining * 3000L,
                     createdAtMs = System.currentTimeMillis(),
                     expiresAtMs = System.currentTimeMillis() + _config.suggestionAutoExpireMs,
@@ -316,19 +316,24 @@ object ZZ143 {
         }
     }
 
+    fun forceAnalysis() {
+        checkInitialized()
+        scope.launch(dispatchers.computation) { runAnalysis() }
+    }
+
     private fun runAnalysis() {
         val actions: List<SemanticAction>
         val screenIds: List<ScreenId>
 
         synchronized(recentActions) {
-            if (recentActions.size < 6) return // Need at least a few actions
+            if (recentActions.size < 3) return
             actions = recentActions.toList()
             screenIds = recentScreenIds.toList()
         }
 
-        // Simple n-gram analysis directly on in-memory actions
+        // N-gram analysis by action type
         val ngramCounts = mutableMapOf<String, MutableList<Int>>()
-        val minN = 2
+        val minN = 1 // Allow single-action workflows (settings)
         val maxN = _config.minPatternOccurrences.coerceAtMost(8)
 
         for (n in minN..maxN.coerceAtMost(actions.size)) {
@@ -338,7 +343,6 @@ object ZZ143 {
             }
         }
 
-        // Find sequences that repeat enough times
         val candidates = ngramCounts.filter { it.value.size >= _config.minPatternOccurrences }
             .entries
             .sortedByDescending { it.key.split("|").size * it.value.size }
@@ -350,25 +354,49 @@ object ZZ143 {
             val existingWorkflow = _workflows.value.find { w ->
                 w.steps.map { it.action.actionType } == actionTypes
             }
+            if (existingWorkflow != null) continue
 
-            if (existingWorkflow != null) continue // Already known
+            // --- Parameter-aware learning ---
+            // For each step position, collect params from ALL occurrences
+            val stepParams = actionTypes.indices.map { stepIdx ->
+                val allParamsAtStep = occurrences.mapNotNull { startIdx ->
+                    val actionIdx = startIdx + stepIdx
+                    if (actionIdx < actions.size) actions[actionIdx].parameters else null
+                }
+                learnParameters(allParamsAtStep)
+            }
 
             val steps = actionTypes.mapIndexed { index, type ->
+                val learnedParams = stepParams[index]
+                val fixedParams = learnedParams
+                    .filter { !it.isVariable && it.defaultValue != null }
+                    .associate { it.name to it.defaultValue!! }
+
                 WorkflowStep(
                     stepIndex = index,
                     action = SemanticAction(
                         actionType = type,
                         actionSource = ActionSource.INFERRED,
                         targetElementId = null,
-                        parameters = emptyMap()
+                        parameters = fixedParams
                     ),
                     expectedScreenId = ScreenId("current"),
-                    parameters = emptyList()
+                    parameters = learnedParams
                 )
             }
 
-            val name = actionTypes.joinToString(" → ") {
-                it.replace("_", " ")
+            // Build rich name from fixed params
+            val paramSummary = steps.flatMap { step ->
+                step.parameters.filter { !it.isVariable && it.defaultValue != null }
+                    .map { it.defaultValue!! }
+            }.distinct()
+
+            val name = if (paramSummary.isNotEmpty()) {
+                paramSummary.take(4).joinToString(", ") {
+                    it.replaceFirstChar { c -> c.uppercase() }
+                }
+            } else {
+                actionTypes.joinToString(" → ") { it.replace("_", " ") }
             }
 
             val confidence = (occurrences.size.toFloat() / actions.size * 2).coerceIn(0f, 1f)
@@ -378,7 +406,7 @@ object ZZ143 {
                     Workflow(
                         workflowId = UlidGenerator.next(),
                         name = name,
-                        description = "${occurrences.size} occurrences, ${actionTypes.size} steps",
+                        description = buildWorkflowDescription(steps, occurrences.size),
                         steps = steps,
                         frequency = WorkflowFrequency(FrequencyType.IRREGULAR, null, null, null, 0f),
                         confidenceScore = confidence,
@@ -397,6 +425,42 @@ object ZZ143 {
             _workflows.value = _workflows.value + newWorkflows
             log("Analysis found ${newWorkflows.size} new workflows (total: ${_workflows.value.size})")
         }
+    }
+
+    /**
+     * Learn which parameters are fixed vs variable across multiple occurrences.
+     */
+    private fun learnParameters(allParamsAtStep: List<Map<String, String>>): List<StepParameter> {
+        if (allParamsAtStep.isEmpty()) return emptyList()
+
+        val allKeys = allParamsAtStep.flatMap { it.keys }.toSet()
+        return allKeys.map { key ->
+            val values = allParamsAtStep.mapNotNull { it[key] }
+            val allSame = values.size == allParamsAtStep.size && values.toSet().size == 1
+            StepParameter(
+                name = key,
+                type = ParameterType.STRING,
+                isVariable = !allSame,
+                defaultValue = if (allSame) values.first() else null,
+                sourceExpression = null
+            )
+        }
+    }
+
+    /**
+     * Build a human-readable workflow description from learned parameters.
+     */
+    private fun buildWorkflowDescription(steps: List<WorkflowStep>, occurrences: Int): String {
+        val fixedParams = steps.flatMap { step ->
+            step.parameters.filter { !it.isVariable && it.defaultValue != null }
+                .map { "${it.name}: ${it.defaultValue}" }
+        }
+        val desc = if (fixedParams.isNotEmpty()) {
+            fixedParams.take(5).joinToString(" · ")
+        } else {
+            "${steps.size} steps"
+        }
+        return "$desc ($occurrences×)"
     }
 
     // =========================================================================
@@ -527,16 +591,44 @@ object ZZ143 {
                     val type = annotation.annotationClass.java.getMethod("type").invoke(annotation) as String
                     if (type == actionType) {
                         return { params ->
-                            // Simple invocation — call with default args
                             method.isAccessible = true
-                            when (method.parameterCount) {
-                                0 -> method.invoke(target)
-                                1 -> method.invoke(target, params.values.firstOrNull() ?: "")
-                                2 -> {
-                                    val values = params.values.toList()
-                                    method.invoke(target, values.getOrElse(0) { "" }, values.getOrElse(1) { 1 })
+
+                            // Name-based parameter mapping via @WatchParam annotations
+                            val methodParams = method.parameters
+                            val args = methodParams.map { methodParam ->
+                                val watchParam = methodParam.annotations.find {
+                                    it.annotationClass.simpleName == "WatchParam"
                                 }
-                                else -> method.invoke(target)
+                                val paramName = if (watchParam != null) {
+                                    try {
+                                        watchParam.annotationClass.java.getMethod("name")
+                                            .invoke(watchParam) as String
+                                    } catch (_: Exception) { methodParam.name }
+                                } else {
+                                    methodParam.name
+                                }
+
+                                val rawValue = params[paramName]
+                                // Type coercion based on parameter type
+                                when (methodParam.type) {
+                                    String::class.java, java.lang.String::class.java ->
+                                        rawValue ?: ""
+                                    Int::class.java, Integer::class.java, java.lang.Integer::class.java ->
+                                        rawValue?.toIntOrNull() ?: 0
+                                    Boolean::class.java, java.lang.Boolean::class.java ->
+                                        rawValue?.toBooleanStrictOrNull() ?: false
+                                    Float::class.java, java.lang.Float::class.java ->
+                                        rawValue?.toFloatOrNull() ?: 0f
+                                    Double::class.java, java.lang.Double::class.java ->
+                                        rawValue?.toDoubleOrNull() ?: 0.0
+                                    else -> rawValue ?: ""
+                                }
+                            }
+
+                            if (args.isEmpty()) {
+                                method.invoke(target)
+                            } else {
+                                method.invoke(target, *args.toTypedArray())
                             }
                         }
                     }

@@ -74,6 +74,7 @@ data class ZZ143Config(
         fun captureTextValues(capture: Boolean) = apply { config = config.copy(captureTextValues = capture) }
         fun sensitiveScreens(screens: Set<String>) = apply { config = config.copy(sensitiveScreens = screens) }
         fun sensitiveElements(elements: Set<String>) = apply { config = config.copy(sensitiveElements = elements) }
+        fun patternAnalysisIntervalMs(ms: Long) = apply { config = config.copy(patternAnalysisIntervalMs = ms) }
         fun debugLogging(enabled: Boolean) = apply { config = config.copy(debugLogging = enabled) }
 
         fun build(): ZZ143Config = config

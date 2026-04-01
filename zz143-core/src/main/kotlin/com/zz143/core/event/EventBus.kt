@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-internal class EventBus(
+class EventBus internal constructor(
     private val filter: EventFilter = EventFilter.default()
 ) {
     private val _events = MutableSharedFlow<ZZ143Event>(

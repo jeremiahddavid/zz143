@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class CaptureEngine internal constructor(
+class CaptureEngine(
     private val config: ZZ143Config,
     private val eventBus: EventBus,
     private val scope: CoroutineScope

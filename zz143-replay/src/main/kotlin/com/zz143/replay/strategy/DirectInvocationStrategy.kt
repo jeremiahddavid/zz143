@@ -29,7 +29,7 @@ class DirectInvocationStrategy(
         val resolvedParams = step.parameters.map { param ->
             when {
                 !param.isVariable -> param.defaultValue?.let { castValue(it, param.type) }
-                param.sourceExpression != null -> resolveExpression(param.sourceExpression, context)
+                param.sourceExpression != null -> resolveExpression(param.sourceExpression!!, context)
                 else -> param.defaultValue?.let { castValue(it, param.type) }
             }
         }

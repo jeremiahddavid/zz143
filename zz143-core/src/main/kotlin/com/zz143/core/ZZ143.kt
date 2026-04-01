@@ -31,13 +31,19 @@ object ZZ143 {
     private var _config = ZZ143Config()
     val config: ZZ143Config get() = _config
 
-    // Core infrastructure
-    internal lateinit var eventBus: EventBus
-    internal lateinit var dispatchers: ZZ143Dispatchers
-    internal lateinit var database: ZZ143Database
-    internal lateinit var fileQueue: FileQueue
-    internal lateinit var scope: CoroutineScope
-    internal lateinit var appContext: Context
+    // Core infrastructure (public for cross-module access within SDK)
+    lateinit var eventBus: EventBus
+        internal set
+    lateinit var dispatchers: ZZ143Dispatchers
+        internal set
+    lateinit var database: ZZ143Database
+        internal set
+    lateinit var fileQueue: FileQueue
+        internal set
+    lateinit var scope: CoroutineScope
+        internal set
+    lateinit var appContext: Context
+        internal set
 
     // Pipeline components
     internal lateinit var batchCollector: EventBatchCollector

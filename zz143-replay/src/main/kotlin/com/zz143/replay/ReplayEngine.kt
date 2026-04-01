@@ -34,15 +34,16 @@ class ReplayEngine(
 
                 val strategy = context.getStrategy(currentStepIndex)
                     ?: strategySelector.selectStrategy(step, context)
-                    ?: run {
-                        if (step.isOptional) {
-                            currentStepIndex++
-                            continue
-                        }
-                        stateMachine.transition(ReplayState.FAILED)
-                        return buildResult(executionId, startMs, ReplayStatus.FAILED, currentStepIndex, steps.size,
-                            ReplayError(ReplayErrorType.ACTION_FAILED, "No strategy available", currentStepIndex))
+
+                if (strategy == null) {
+                    if (step.isOptional) {
+                        currentStepIndex++
+                        continue
                     }
+                    stateMachine.transition(ReplayState.FAILED)
+                    return buildResult(executionId, startMs, ReplayStatus.FAILED, currentStepIndex, steps.size,
+                        ReplayError(ReplayErrorType.ACTION_FAILED, "No strategy available", currentStepIndex))
+                }
 
                 val stepResult = strategy.execute(step, context)
 

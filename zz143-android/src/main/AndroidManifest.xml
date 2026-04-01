@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
     <application>
         <provider
             android:name="androidx.startup.InitializationProvider"
@@ -10,17 +12,5 @@
                 android:name="com.zz143.android.ZZ143Initializer"
                 android:value="androidx.startup" />
         </provider>
-
-        <service
-            android:name="com.zz143.android.accessibility.ZZ143AccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/zz143_accessibility_config" />
-        </service>
     </application>
 </manifest>

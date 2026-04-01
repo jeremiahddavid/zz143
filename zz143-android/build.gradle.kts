@@ -1,6 +1,6 @@
 plugins {
     id("zz143.android-library")
-    alias(libs.plugins.compose.compiler)
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {

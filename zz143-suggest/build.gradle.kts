@@ -1,6 +1,6 @@
 plugins {
     id("zz143.android-library")
-    alias(libs.plugins.compose.compiler)
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -13,6 +13,7 @@ android {
 
 dependencies {
     api(project(":zz143-core"))
+    implementation(project(":zz143-learn"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)

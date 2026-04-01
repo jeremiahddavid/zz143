@@ -18,7 +18,9 @@ import com.zz143.demo.actions.DemoActions
 import com.zz143.demo.data.Product
 import com.zz143.demo.data.SampleData
 import com.zz143.suggest.compose.ZZ143SuggestionSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     private val demoActions = DemoActions()
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DemoApp(actions: DemoActions) {
     var currentScreen by remember { mutableStateOf("menu") }

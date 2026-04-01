@@ -9,7 +9,7 @@ import java.io.*
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.zip.CRC32
 
-internal class FileQueue(
+class FileQueue internal constructor(
     private val directory: File,
     private val maxSegmentSize: Long = 512 * 1024L,
     private val maxTotalSize: Long = 10 * 1024 * 1024L,

@@ -1,9 +1,5 @@
-plugins {
-    alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.android.library) apply false
-    alias(libs.plugins.kotlin.android) apply false
-    alias(libs.plugins.compose.compiler) apply false
-}
+// Root project — plugins are applied by buildSrc convention plugins and module-level build files.
+// No plugins applied here to avoid conflict with buildSrc classpath.
 
 allprojects {
     group = property("ZZ143_GROUP") as String

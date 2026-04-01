@@ -4,8 +4,14 @@ data class CoffeeProduct(
     val id: String,
     val name: String,
     val price: Double,
-    val description: String
+    val description: String,
+    val category: ProductCategory = ProductCategory.DRINK
 )
+
+enum class ProductCategory(val label: String) {
+    DRINK("Drinks"),
+    FOOD("Food & Snacks")
+}
 
 data class CartItem(
     val product: CoffeeProduct,
@@ -48,6 +54,15 @@ object SampleProducts {
         CoffeeProduct("cold-brew", "Cold Brew", 4.25, "Slow-steeped cold coffee"),
         CoffeeProduct("matcha", "Matcha Latte", 5.25, "Japanese green tea with milk"),
         CoffeeProduct("chai", "Chai Latte", 4.75, "Spiced tea with steamed milk"),
-        CoffeeProduct("espresso", "Espresso", 3.00, "Pure concentrated coffee")
+        CoffeeProduct("espresso", "Espresso", 3.00, "Pure concentrated coffee"),
+        // Food items — tests multi-item ordering with same action type, different params
+        CoffeeProduct("croissant", "Butter Croissant", 3.50, "Flaky French pastry", ProductCategory.FOOD),
+        CoffeeProduct("muffin", "Blueberry Muffin", 3.25, "Fresh-baked with real blueberries", ProductCategory.FOOD),
+        CoffeeProduct("bagel", "Everything Bagel", 2.75, "Toasted with cream cheese", ProductCategory.FOOD),
+        CoffeeProduct("cookie", "Chocolate Chip Cookie", 2.50, "Warm and gooey", ProductCategory.FOOD),
+        CoffeeProduct("water", "Bottled Water", 1.50, "Still mineral water", ProductCategory.FOOD)
     )
+
+    val drinks get() = all.filter { it.category == ProductCategory.DRINK }
+    val food get() = all.filter { it.category == ProductCategory.FOOD }
 }

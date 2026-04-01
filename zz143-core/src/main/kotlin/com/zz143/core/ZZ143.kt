@@ -128,6 +128,15 @@ object ZZ143 {
             }
         }
 
+        // Load persisted workflows from SQLite
+        scope.launch(dispatchers.io) {
+            val loaded = loadWorkflowsFromDb()
+            if (loaded.isNotEmpty()) {
+                _workflows.value = loaded
+                log("Loaded ${loaded.size} persisted workflows from database")
+            }
+        }
+
         _isInitialized = true
         log("ZZ143 initialized (v${BuildConfig.VERSION_NAME})")
     }
@@ -423,8 +432,17 @@ object ZZ143 {
 
         if (newWorkflows.isNotEmpty()) {
             _workflows.value = _workflows.value + newWorkflows
+            // Persist to SQLite for survival across app restarts
+            scope.launch(dispatchers.io) {
+                for (wf in newWorkflows) {
+                    saveWorkflowToDb(wf)
+                }
+            }
             log("Analysis found ${newWorkflows.size} new workflows (total: ${_workflows.value.size})")
         }
+
+        // Time-based proactive suggestions
+        checkTimeBasedSuggestions()
     }
 
     /**
@@ -646,6 +664,173 @@ object ZZ143 {
 
     fun getWorkflow(workflowId: String): Workflow? =
         _workflows.value.find { it.workflowId == workflowId }
+
+    // =========================================================================
+    // Workflow Persistence
+    // =========================================================================
+
+    private fun saveWorkflowToDb(workflow: Workflow) {
+        try {
+            val db = database.writableDatabase
+            val stepsJson = workflow.steps.joinToString(";") { step ->
+                val params = step.parameters.joinToString(",") { p ->
+                    "${p.name}=${p.defaultValue ?: ""}:${p.isVariable}"
+                }
+                "${step.action.actionType}|$params"
+            }
+            val values = android.content.ContentValues().apply {
+                put("workflow_id", workflow.workflowId)
+                put("name", workflow.name)
+                put("description", workflow.description)
+                put("steps_json", stepsJson)
+                put("frequency_type", workflow.frequency.type.ordinal)
+                put("frequency_json", "${workflow.frequency.intervalMs ?: 0}|${workflow.frequency.dayOfWeek ?: -1}|${workflow.frequency.hourOfDay ?: -1}|${workflow.frequency.confidence}")
+                put("confidence_score", workflow.confidenceScore.toDouble())
+                put("first_seen_ms", workflow.firstSeenMs)
+                put("last_seen_ms", workflow.lastSeenMs)
+                put("execution_count", workflow.executionCount)
+                put("automation_count", workflow.automationCount)
+                put("success_rate", workflow.successRate.toDouble())
+                put("status", workflow.status.ordinal)
+                put("version", workflow.version)
+            }
+            db.insertWithOnConflict("workflows", null, values,
+                android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
+            log("Workflow persisted: ${workflow.name}")
+        } catch (e: Exception) {
+            log("Failed to persist workflow: ${e.message}")
+        }
+    }
+
+    private fun loadWorkflowsFromDb(): List<Workflow> {
+        try {
+            val db = database.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT * FROM workflows WHERE status < ?",
+                arrayOf("${WorkflowStatus.DEPRECATED.ordinal}")
+            )
+            val workflows = mutableListOf<Workflow>()
+            while (cursor.moveToNext()) {
+                try {
+                    val stepsJson = cursor.getString(cursor.getColumnIndexOrThrow("steps_json"))
+                    val steps = parseStepsJson(stepsJson)
+                    val freqJson = cursor.getString(cursor.getColumnIndexOrThrow("frequency_json"))
+                    val freqParts = freqJson.split("|")
+
+                    workflows.add(Workflow(
+                        workflowId = cursor.getString(cursor.getColumnIndexOrThrow("workflow_id")),
+                        name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
+                        description = cursor.getString(cursor.getColumnIndexOrThrow("description")),
+                        steps = steps,
+                        frequency = WorkflowFrequency(
+                            type = FrequencyType.entries[cursor.getInt(cursor.getColumnIndexOrThrow("frequency_type"))],
+                            intervalMs = freqParts.getOrNull(0)?.toLongOrNull(),
+                            dayOfWeek = freqParts.getOrNull(1)?.toIntOrNull()?.takeIf { it >= 0 },
+                            hourOfDay = freqParts.getOrNull(2)?.toIntOrNull()?.takeIf { it >= 0 },
+                            confidence = freqParts.getOrNull(3)?.toFloatOrNull() ?: 0f
+                        ),
+                        confidenceScore = cursor.getFloat(cursor.getColumnIndexOrThrow("confidence_score")),
+                        firstSeenMs = cursor.getLong(cursor.getColumnIndexOrThrow("first_seen_ms")),
+                        lastSeenMs = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen_ms")),
+                        executionCount = cursor.getInt(cursor.getColumnIndexOrThrow("execution_count")),
+                        automationCount = cursor.getInt(cursor.getColumnIndexOrThrow("automation_count")),
+                        successRate = cursor.getFloat(cursor.getColumnIndexOrThrow("success_rate")),
+                        status = WorkflowStatus.entries[cursor.getInt(cursor.getColumnIndexOrThrow("status"))],
+                        version = cursor.getInt(cursor.getColumnIndexOrThrow("version"))
+                    ))
+                } catch (_: Exception) { /* skip corrupt rows */ }
+            }
+            cursor.close()
+            return workflows
+        } catch (e: Exception) {
+            log("Failed to load workflows: ${e.message}")
+            return emptyList()
+        }
+    }
+
+    private fun parseStepsJson(stepsJson: String): List<WorkflowStep> {
+        return stepsJson.split(";").mapIndexed { index, stepStr ->
+            val parts = stepStr.split("|", limit = 2)
+            val actionType = parts[0]
+            val params = if (parts.size > 1 && parts[1].isNotBlank()) {
+                parts[1].split(",").mapNotNull { paramStr ->
+                    val eqParts = paramStr.split("=", limit = 2)
+                    if (eqParts.size == 2) {
+                        val colonParts = eqParts[1].split(":", limit = 2)
+                        StepParameter(
+                            name = eqParts[0],
+                            type = ParameterType.STRING,
+                            isVariable = colonParts.getOrNull(1)?.toBooleanStrictOrNull() ?: false,
+                            defaultValue = colonParts[0].ifEmpty { null },
+                            sourceExpression = null
+                        )
+                    } else null
+                }
+            } else emptyList()
+
+            val fixedParams = params.filter { !it.isVariable && it.defaultValue != null }
+                .associate { it.name to it.defaultValue!! }
+
+            WorkflowStep(
+                stepIndex = index,
+                action = SemanticAction(
+                    actionType = actionType,
+                    actionSource = ActionSource.INFERRED,
+                    targetElementId = null,
+                    parameters = fixedParams
+                ),
+                expectedScreenId = ScreenId("current"),
+                parameters = params
+            )
+        }
+    }
+
+    // =========================================================================
+    // Time-Based Proactive Suggestions
+    // =========================================================================
+
+    private fun checkTimeBasedSuggestions() {
+        if (!_config.suggestionsEnabled) return
+
+        val now = System.currentTimeMillis()
+        val cal = java.util.Calendar.getInstance()
+        val currentHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        val currentDow = (cal.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 + 1 // Mon=1..Sun=7
+
+        for (workflow in _workflows.value) {
+            if (workflow.status == WorkflowStatus.REJECTED) continue
+            if (workflow.status == WorkflowStatus.DEPRECATED) continue
+
+            val freq = workflow.frequency
+            if (freq.confidence < 0.5f) continue
+            if (freq.hourOfDay == null) continue
+
+            val hourMatch = currentHour == freq.hourOfDay
+            val dayMatch = freq.dayOfWeek == null || currentDow == freq.dayOfWeek
+
+            if (hourMatch && dayMatch) {
+                // Don't suggest if already suggested recently (within 1 hour)
+                val timeSinceLastSeen = now - workflow.lastSeenMs
+                if (timeSinceLastSeen < 3600_000L) continue
+
+                val suggestion = Suggestion(
+                    suggestionId = UlidGenerator.next(),
+                    workflow = workflow,
+                    displayType = SuggestionDisplayType.NOTIFICATION,
+                    title = "Time for '${workflow.name}'?",
+                    description = "You usually do this around now",
+                    estimatedTimeSavedMs = workflow.steps.size * 3000L,
+                    createdAtMs = now,
+                    expiresAtMs = now + _config.suggestionAutoExpireMs,
+                    priority = 1
+                )
+                _activeSuggestion.value = suggestion
+                _suggestions.tryEmit(suggestion)
+                log("Time-based suggestion: ${workflow.name} (hour=$currentHour, day=$currentDow)")
+                break // Only one time-based suggestion per analysis cycle
+            }
+        }
+    }
 
     // =========================================================================
     // Data Management

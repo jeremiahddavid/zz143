@@ -241,6 +241,32 @@ zz143 is on-device by design:
 - **No network calls.** Nothing leaves the device. No cloud, no analytics server, no telemetry.
 - **User control.** Users can dismiss, snooze, or permanently reject any suggestion.
 
+## FAQ
+
+**How is this different from a cron job or WorkManager?**
+
+A cron job runs tasks the developer scheduled at build time. zz143 learns tasks the user repeats at runtime. If you know what your users will repeat and when, use `WorkManager`. If your users surprise you with patterns you didn't anticipate, zz143 discovers those patterns for you. The value is in the discovery — finding which workflows repeat, which parameters are consistent, and which users have which patterns.
+
+**Why not just use SharedPreferences for "remember my settings"?**
+
+For simple preferences (dark mode, language), SharedPreferences is the right answer in 5 lines. zz143 is for multi-step workflows with parameters — like "always orders a Large Latte with Oat Milk, applies SAVE10, picks up." That's not a single preference; it's a learned behavioral sequence.
+
+**Why do I have to call `trackAction()` manually?**
+
+Deliberate design choice for reliability and privacy. Auto-capturing every UI interaction would be noisy, hard to debug, and raises privacy concerns. Explicit tracking means you control exactly what the SDK learns from. We're exploring Compose semantics auto-capture as a future option.
+
+**How big is the SDK?**
+
+Not yet benchmarked. This is on the roadmap before production readiness.
+
+**Does this work with Flutter / React Native?**
+
+Not yet. The core SDK is Kotlin. Flutter and React Native wrappers are planned but depend on community demand. If you need this, [open an issue](https://github.com/jeremiahddavid/zz143/issues) — it helps us prioritize.
+
+**How does this compare to Google AppFunctions?**
+
+AppFunctions lets Gemini call your app's functions when the user asks. zz143 learns which functions the user calls repeatedly and proactively suggests them. AppFunctions is reactive (user asks). zz143 is predictive (SDK notices a pattern). They're complementary — we plan to add an AppFunctions bridge so zz143 can discover `@AppFunction`-annotated methods as execution targets.
+
 ## Roadmap
 
 - [x] Core pipeline: capture, learn, suggest, replay
@@ -250,13 +276,19 @@ zz143 is on-device by design:
 - [x] Demo app with 3 scenarios
 - [x] Unit tests (153 tests)
 - [ ] Publish to Maven Central
+- [ ] Compose semantics auto-capture (reduce manual `trackAction()` calls)
+- [ ] Gradle plugin for one-line setup
+- [ ] Analytics callbacks (`onWorkflowDetected`, `onSuggestionAccepted`)
+- [ ] Consent framework (GDPR opt-in/opt-out)
+- [ ] Workflow templates (import pre-defined patterns)
 - [ ] Integration tests (end-to-end pipeline)
-- [ ] Performance benchmarks
-- [ ] Compose semantics tree auto-capture
+- [ ] Performance benchmarks and SDK size documentation
+- [ ] MCP server integration
+- [ ] AppFunctions bridge
+- [ ] Flutter plugin
+- [ ] React Native module
 - [ ] iOS SDK (Swift)
-- [ ] React Native / Flutter wrappers
 - [ ] Developer dashboard (pattern analytics)
-- [ ] AppFunctions bridge (use `@AppFunction` methods as execution targets)
 
 ## Contributing
 

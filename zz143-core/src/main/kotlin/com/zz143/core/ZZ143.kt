@@ -1,7 +1,9 @@
 package com.zz143.core
 
 import android.content.Context
+import com.zz143.core.event.EventBatchCollector
 import com.zz143.core.event.EventBus
+import com.zz143.core.event.EventEncoder
 import com.zz143.core.id.UlidGenerator
 import com.zz143.core.model.*
 import com.zz143.core.storage.FileQueue
@@ -9,6 +11,7 @@ import com.zz143.core.storage.ZZ143Database
 import com.zz143.core.threading.ZZ143Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +29,7 @@ object ZZ143 {
     internal lateinit var database: ZZ143Database
     internal lateinit var fileQueue: FileQueue
     internal lateinit var scope: CoroutineScope
+    internal lateinit var batchCollector: EventBatchCollector
     internal lateinit var appContext: Context
 
     private val _sessionId = MutableStateFlow<SessionId?>(null)
@@ -48,6 +52,10 @@ object ZZ143 {
             maxTotalSize = config.maxQueueSizeMb * 1024L * 1024L,
             dispatchers = dispatchers
         )
+
+        scope.launch { fileQueue.initialize() }
+        batchCollector = EventBatchCollector(eventBus, EventEncoder(), fileQueue, _config, scope, dispatchers)
+        batchCollector.start()
 
         _isInitialized = true
         log("ZZ143 initialized (v${BuildConfig.VERSION_NAME})")

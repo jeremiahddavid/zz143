@@ -253,15 +253,21 @@ object ZZ143 {
             if (workflow.status !in setOf(WorkflowStatus.DETECTED, WorkflowStatus.ACCEPTED, WorkflowStatus.ACTIVE)) continue
 
             val workflowTypes = workflow.steps.map { it.action.actionType }
-            val matchLength = recentTypes.indices.count { i ->
-                i < workflowTypes.size && recentTypes[recentTypes.size - 1 - i] ==
-                    workflowTypes[workflowTypes.size - 1 - (recentTypes.size - 1 - i)]
-            }.coerceAtMost(0) // Simplified — use forward match
 
-            // Forward prefix match
-            val forwardMatch = matchPrefix(recentTypes, workflowTypes)
-            if (forwardMatch >= 2 && forwardMatch < workflowTypes.size) {
-                val remaining = workflowTypes.size - forwardMatch
+            // Check if any recent suffix matches the start of the workflow
+            // e.g., recent=[..., checkout, add_to_cart], workflow=[add_to_cart, checkout]
+            // We want to find that the last action "add_to_cart" matches workflow[0]
+            var bestMatch = 0
+            for (suffixLen in 1..workflowTypes.size.coerceAtMost(recentTypes.size)) {
+                val suffix = recentTypes.takeLast(suffixLen)
+                val m = matchPrefix(suffix, workflowTypes)
+                if (m == suffixLen) bestMatch = m // Only count contiguous matches from suffix start
+            }
+            log("  Prefix: recent_last=${recentTypes.lastOrNull()} wf=$workflowTypes → bestMatch=$bestMatch")
+
+            val minMatch = if (workflowTypes.size <= 3) 1 else 2
+            if (bestMatch >= minMatch && bestMatch < workflowTypes.size) {
+                val remaining = workflowTypes.size - bestMatch
                 val suggestion = Suggestion(
                     suggestionId = UlidGenerator.next(),
                     workflow = workflow,

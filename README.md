@@ -208,6 +208,7 @@ This is alpha software. Be aware of:
 - **Manual tracking required.** You must call `ZZ143.trackAction()` at every step. There is no automatic UI interaction capture.
 - **Not published to Maven.** Must be used as local project dependency or built from source.
 - **Minimally tested.** Verified on one emulator (API 36). No production testing. No performance benchmarks.
+- **Kotlin/Java only.** No Flutter, React Native, or Xamarin support yet. The core SDK is Kotlin — cross-framework wrappers are on the roadmap but depend on community demand.
 - **No iOS SDK.** Android only for now.
 - **No cross-device sync.** Patterns are learned per-device only.
 - **No PM dashboard.** No analytics or insights for product teams.

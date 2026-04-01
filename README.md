@@ -32,6 +32,20 @@
 
 zz143 observes user actions, detects recurring patterns using n-gram sequence analysis, and offers to automate them via a suggestion bottom sheet. When the user confirms, it calls your annotated handler methods directly.
 
+### Who this is for
+
+zz143 is useful for apps where **users repeat multi-step workflows with consistent parameters**:
+
+- **Finance/expense apps** — "Coffee ₹250, Food category" entered every morning
+- **Food ordering** — same customized order every week
+- **E-commerce** — repeat purchases with same shipping/payment
+- **Enterprise data entry** — same form fields filled 50x/day
+- **Booking apps** — same route, same preferences, same payment method
+
+### Who this is NOT for
+
+If your app has one-shot flows (file converters, generators), server-side automation (CRM campaigns), or simple preferences (theme/language toggles that SharedPreferences handles in 5 lines) — you don't need this SDK.
+
 ```
 A user orders a latte with the same customizations 3 times:
   1. Customize: Large, Oat Milk, Extra Shot

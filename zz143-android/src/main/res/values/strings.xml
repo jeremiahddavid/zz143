@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="zz143_accessibility_description">zz143 uses accessibility to replay learned workflows on your behalf. Enable only when prompted by an app using zz143.</string>
+</resources>

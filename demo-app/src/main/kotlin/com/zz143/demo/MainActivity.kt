@@ -3,7 +3,6 @@ package com.zz143.demo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,9 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zz143.core.ZZ143
+import com.zz143.core.model.Suggestion
 import com.zz143.demo.actions.DemoActions
 import com.zz143.demo.data.Product
 import com.zz143.demo.data.SampleData
+import com.zz143.suggest.compose.ZZ143SuggestionSheet
 
 class MainActivity : ComponentActivity() {
 
@@ -25,12 +26,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Register our actions with zz143
         ZZ143.registerActions(demoActions)
 
         setContent {
             MaterialTheme {
-                DemoApp(demoActions)
+                val activeSuggestion by ZZ143.activeSuggestion.collectAsState()
+
+                Box {
+                    DemoApp(demoActions)
+
+                    // Suggestion bottom sheet — appears when SDK detects a pattern
+                    ZZ143SuggestionSheet(
+                        suggestion = activeSuggestion,
+                        onAccept = { suggestion ->
+                            ZZ143.acceptSuggestion(suggestion.suggestionId)
+                        },
+                        onDismiss = { suggestion ->
+                            ZZ143.dismissSuggestion(suggestion.suggestionId)
+                        },
+                        onReject = { suggestion ->
+                            ZZ143.rejectSuggestion(suggestion.suggestionId)
+                        }
+                    )
+                }
             }
         }
     }
@@ -47,11 +65,20 @@ fun DemoApp(actions: DemoActions) {
     var cartCount by remember { mutableIntStateOf(0) }
     var orderResult by remember { mutableStateOf<String?>(null) }
 
+    // Show detected workflows count in the top bar
+    val workflows by ZZ143.workflows.collectAsState()
+
     Scaffold(
         topBar = {
             SmallTopAppBar(
                 title = { Text("zz143 Coffee Demo") },
                 actions = {
+                    if (workflows.isNotEmpty()) {
+                        Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                            Text("${workflows.size}")
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     TextButton(onClick = { currentScreen = "cart" }) {
                         Text("Cart ($cartCount)")
                     }
@@ -148,7 +175,7 @@ fun CartScreen(
                     Text("${"%.2f".format(item.product.price * item.quantity)}")
                 }
             }
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween

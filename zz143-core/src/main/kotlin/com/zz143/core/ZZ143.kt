@@ -612,23 +612,27 @@ object ZZ143 {
                             method.isAccessible = true
 
                             // Name-based parameter mapping via @WatchParam annotations
-                            val methodParams = method.parameters
-                            val args = methodParams.map { methodParam ->
-                                val watchParam = methodParam.annotations.find {
+                            // Uses parameterTypes + parameterAnnotations (API 1) instead of
+                            // Method.getParameters() (API 26) for minSdk 24 compat
+                            val paramTypes = method.parameterTypes
+                            val paramAnnotations = method.parameterAnnotations
+                            val args = paramTypes.indices.map { i ->
+                                val annotations = paramAnnotations[i]
+                                val watchParam = annotations.find {
                                     it.annotationClass.simpleName == "WatchParam"
                                 }
                                 val paramName = if (watchParam != null) {
                                     try {
                                         watchParam.annotationClass.java.getMethod("name")
                                             .invoke(watchParam) as String
-                                    } catch (_: Exception) { methodParam.name }
+                                    } catch (_: Exception) { "arg$i" }
                                 } else {
-                                    methodParam.name
+                                    // Fallback: try matching by position from params map
+                                    params.keys.elementAtOrNull(i) ?: "arg$i"
                                 }
 
                                 val rawValue = params[paramName]
-                                // Type coercion based on parameter type
-                                when (methodParam.type) {
+                                when (paramTypes[i]) {
                                     String::class.java, java.lang.String::class.java ->
                                         rawValue ?: ""
                                     Int::class.java, Integer::class.java, java.lang.Integer::class.java ->

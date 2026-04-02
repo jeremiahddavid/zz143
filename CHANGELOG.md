@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Analytics callbacks**: `AnalyticsListener` interface with 7 events (`onWorkflowDetected`, `onSuggestionShown/Accepted/Dismissed/Rejected`, `onReplayStarted/Completed`). Thread-safe `AnalyticsDispatcher` using `CopyOnWriteArrayList`.
+- **Consent framework**: `ConsentLevel` enum (`FULL`, `ANALYTICS_ONLY`, `NONE`). `ConsentManager` with persistence to `SharedPreferences`. `ZZ143.setConsent()` / `getConsentLevel()` public API. Capture and analytics gated behind consent checks.
+- **Maven Central publishing**: Switched to `com.vanniktech.maven.publish` plugin with `SonatypeHost.CENTRAL_PORTAL` for correct Central Portal upload.
+- **30 new unit tests** for consent management and analytics dispatcher (205 total across 12 test classes)
+
+### Changed
+
+- `ZZ143Config` now includes `requireExplicitConsent: Boolean = false`
+- `ZZ143.trackAction()` and `startCapturing()` are now gated behind consent — no-op when consent is `NONE` or `ANALYTICS_ONLY`
+
 ## [0.1.0-alpha01] - 2026-04-01
 
 Initial alpha release. This is an early prototype — APIs will change, not production-ready.

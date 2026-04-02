@@ -1,6 +1,10 @@
 package com.zz143.core
 
 import android.content.Context
+import com.zz143.core.analytics.AnalyticsDispatcher
+import com.zz143.core.analytics.AnalyticsListener
+import com.zz143.core.consent.ConsentLevel
+import com.zz143.core.consent.ConsentManager
 import com.zz143.core.event.EventBatchCollector
 import com.zz143.core.event.EventBus
 import com.zz143.core.event.EventEncoder
@@ -49,6 +53,11 @@ object ZZ143 {
     internal lateinit var batchCollector: EventBatchCollector
     internal lateinit var fileQueueDrainer: FileQueueDrainer
 
+    // Consent + Analytics
+    lateinit var consentManager: ConsentManager
+        private set
+    internal val analyticsDispatcher = AnalyticsDispatcher()
+
     // Action registry
     private val actionRegistrations = mutableListOf<Any>()
     private val registeredActionTypes = mutableSetOf<String>()
@@ -94,6 +103,12 @@ object ZZ143 {
         _config = config
         dispatchers = ZZ143Dispatchers()
         scope = CoroutineScope(SupervisorJob() + dispatchers.io)
+
+        // Consent
+        consentManager = ConsentManager(appContext, onRevoked = { clearAllData() })
+        if (config.requireExplicitConsent) {
+            consentManager.grant(ConsentLevel.NONE)
+        }
 
         // Core infrastructure
         eventBus = EventBus(config.eventFilter)
@@ -154,6 +169,10 @@ object ZZ143 {
     fun startCapturing() {
         checkInitialized()
         if (_isCapturing.value) return
+        if (!consentManager.canCapture()) {
+            log("startCapturing() blocked — consent level: ${consentManager.level.value}")
+            return
+        }
         _sessionId.value = SessionId(UlidGenerator.next())
         _isCapturing.value = true
 
@@ -203,6 +222,7 @@ object ZZ143 {
 
     fun trackAction(actionType: String, parameters: Map<String, String> = emptyMap()) {
         checkInitialized()
+        if (!consentManager.canCapture()) return
         val session = _sessionId.value ?: return
         val screenId = ScreenId("current") // Will be resolved by CaptureEngine if attached
 
@@ -290,6 +310,9 @@ object ZZ143 {
                 )
                 _activeSuggestion.value = suggestion
                 _suggestions.tryEmit(suggestion)
+                if (consentManager.canFireAnalytics()) {
+                    analyticsDispatcher.dispatchSuggestionShown(suggestion)
+                }
                 log("Suggestion emitted: ${workflow.name} ($remaining steps remaining)")
             }
         }
@@ -438,6 +461,12 @@ object ZZ143 {
                     saveWorkflowToDb(wf)
                 }
             }
+            // Analytics: notify listeners of detected workflows
+            if (consentManager.canFireAnalytics()) {
+                for (wf in newWorkflows) {
+                    analyticsDispatcher.dispatchWorkflowDetected(wf)
+                }
+            }
             log("Analysis found ${newWorkflows.size} new workflows (total: ${_workflows.value.size})")
         }
 
@@ -490,6 +519,9 @@ object ZZ143 {
         if (suggestion.suggestionId != suggestionId) return
 
         _activeSuggestion.value = null
+        if (consentManager.canFireAnalytics()) {
+            analyticsDispatcher.dispatchSuggestionAccepted(suggestion)
+        }
         log("Suggestion accepted: ${suggestion.workflow.name}")
 
         // Execute the remaining steps
@@ -499,13 +531,21 @@ object ZZ143 {
     }
 
     fun dismissSuggestion(suggestionId: String) {
+        val suggestion = _activeSuggestion.value ?: return
         _activeSuggestion.value = null
+        if (consentManager.canFireAnalytics()) {
+            analyticsDispatcher.dispatchSuggestionDismissed(suggestion)
+        }
         log("Suggestion dismissed")
     }
 
     fun rejectSuggestion(suggestionId: String) {
         val suggestion = _activeSuggestion.value ?: return
         _activeSuggestion.value = null
+
+        if (consentManager.canFireAnalytics()) {
+            analyticsDispatcher.dispatchSuggestionRejected(suggestion)
+        }
 
         // Mark workflow as rejected
         _workflows.value = _workflows.value.map { w ->
@@ -527,6 +567,9 @@ object ZZ143 {
 
         log("Executing workflow: ${workflow.name} (${workflow.steps.size} steps)")
         _replayState.value = ReplayStatus.SUCCESS // Mark as running
+        if (consentManager.canFireAnalytics()) {
+            analyticsDispatcher.dispatchReplayStarted(workflow)
+        }
 
         var stepsCompleted = 0
 
@@ -547,7 +590,7 @@ object ZZ143 {
 
                     if (!step.isOptional) {
                         _replayState.value = ReplayStatus.FAILED
-                        return ReplayResult(
+                        val failResult = ReplayResult(
                             workflowId = workflow.workflowId,
                             executionId = executionId,
                             startedAtMs = startMs,
@@ -562,6 +605,10 @@ object ZZ143 {
                                 step.stepIndex
                             )
                         )
+                        if (consentManager.canFireAnalytics()) {
+                            analyticsDispatcher.dispatchReplayCompleted(workflow, failResult)
+                        }
+                        return failResult
                     }
                 }
             } else if (!step.isOptional) {
@@ -583,7 +630,7 @@ object ZZ143 {
         _replayState.value = ReplayStatus.SUCCESS
         log("Workflow completed: ${workflow.name} ($stepsCompleted/${workflow.steps.size} steps)")
 
-        return ReplayResult(
+        val result = ReplayResult(
             workflowId = workflow.workflowId,
             executionId = executionId,
             startedAtMs = startMs,
@@ -592,6 +639,10 @@ object ZZ143 {
             stepsCompleted = stepsCompleted,
             totalSteps = workflow.steps.size
         )
+        if (consentManager.canFireAnalytics()) {
+            analyticsDispatcher.dispatchReplayCompleted(workflow, result)
+        }
+        return result
     }
 
     /**
@@ -830,6 +881,9 @@ object ZZ143 {
                 )
                 _activeSuggestion.value = suggestion
                 _suggestions.tryEmit(suggestion)
+                if (consentManager.canFireAnalytics()) {
+                    analyticsDispatcher.dispatchSuggestionShown(suggestion)
+                }
                 log("Time-based suggestion: ${workflow.name} (hour=$currentHour, day=$currentDow)")
                 break // Only one time-based suggestion per analysis cycle
             }
@@ -859,6 +913,33 @@ object ZZ143 {
         _activeSuggestion.value = null
         log("All data cleared")
     }
+
+    // =========================================================================
+    // Analytics
+    // =========================================================================
+
+    fun addAnalyticsListener(listener: AnalyticsListener) {
+        analyticsDispatcher.addListener(listener)
+    }
+
+    fun removeAnalyticsListener(listener: AnalyticsListener) {
+        analyticsDispatcher.removeListener(listener)
+    }
+
+    // =========================================================================
+    // Consent
+    // =========================================================================
+
+    fun setConsent(level: ConsentLevel) {
+        checkInitialized()
+        consentManager.grant(level)
+        if (level == ConsentLevel.NONE) {
+            stopCapturing()
+        }
+        log("Consent set to: $level")
+    }
+
+    fun getConsentLevel(): ConsentLevel = consentManager.level.value
 
     // =========================================================================
     // Debug

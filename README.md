@@ -84,7 +84,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.jeremiahddavid:zz143-android:0.1.0")
+    implementation("io.github.jeremiahddavid:zz143-android:0.1.0-alpha01")
 }
 ```
 
@@ -200,7 +200,7 @@ To run the demo: `./gradlew :demo-app:installDebug`
 
 | Module | Description |
 |--------|-------------|
-| `zz143-core` | Data models, event bus, storage engine, orchestration, configuration |
+| `zz143-core` | Data models, event bus, storage engine, orchestration, configuration, consent management, analytics callbacks |
 | `zz143-capture` | View tree walker, gesture interceptor, delta computation |
 | `zz143-learn` | N-gram extraction, Smith-Waterman alignment, temporal detection, confidence scoring |
 | `zz143-suggest` | Suggestion engine, throttling, user preference tracking, Compose bottom sheet |
@@ -216,9 +216,11 @@ To run the demo: `./gradlew :demo-app:installDebug`
 - Workflow persistence across app restarts (SQLite)
 - Time-based proactive suggestions (detects daily/weekly patterns)
 - Suggestion throttling with exponential backoff on dismissal
+- Analytics callbacks interface (7 events: workflow detected, suggestion shown/accepted/dismissed/rejected, replay started/completed)
+- Consent framework with 3 levels (FULL, ANALYTICS_ONLY, NONE), persisted to SharedPreferences
 - Binary TLV event encoding (3-5x smaller than JSON)
 - Crash-safe file queue with CRC32 checksums
-- 153 unit tests across 10 test classes
+- 205 unit tests across 12 test classes
 
 ## Known limitations
 
@@ -279,12 +281,12 @@ AppFunctions lets Gemini call your app's functions when the user asks. zz143 lea
 - [x] Workflow persistence (SQLite)
 - [x] Time-based proactive suggestions
 - [x] Demo app with 3 scenarios
-- [x] Unit tests (153 tests)
+- [x] Unit tests (205 tests)
+- [x] Analytics callbacks (`onWorkflowDetected`, `onSuggestionAccepted`, etc.)
+- [x] Consent framework (FULL / ANALYTICS_ONLY / NONE with persistence)
 - [ ] Publish to Maven Central
 - [ ] Compose semantics auto-capture (reduce manual `trackAction()` calls)
 - [ ] Gradle plugin for one-line setup
-- [ ] Analytics callbacks (`onWorkflowDetected`, `onSuggestionAccepted`)
-- [ ] Consent framework (GDPR opt-in/opt-out)
 - [ ] Workflow templates (import pre-defined patterns)
 - [ ] Integration tests (end-to-end pipeline)
 - [ ] Performance benchmarks and SDK size documentation

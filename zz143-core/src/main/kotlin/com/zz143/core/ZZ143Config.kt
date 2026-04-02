@@ -51,6 +51,9 @@ data class ZZ143Config(
     // Filtering
     val eventFilter: EventFilter = EventFilter.default(),
 
+    // Consent
+    val requireExplicitConsent: Boolean = false,
+
     // Compose
     val composeEnabled: Boolean = true,
 
@@ -75,6 +78,7 @@ data class ZZ143Config(
         fun sensitiveScreens(screens: Set<String>) = apply { config = config.copy(sensitiveScreens = screens) }
         fun sensitiveElements(elements: Set<String>) = apply { config = config.copy(sensitiveElements = elements) }
         fun patternAnalysisIntervalMs(ms: Long) = apply { config = config.copy(patternAnalysisIntervalMs = ms) }
+        fun requireExplicitConsent(required: Boolean) = apply { config = config.copy(requireExplicitConsent = required) }
         fun debugLogging(enabled: Boolean) = apply { config = config.copy(debugLogging = enabled) }
 
         fun build(): ZZ143Config = config

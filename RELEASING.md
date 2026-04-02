@@ -42,8 +42,8 @@ git push origin main --tags
 
 The `publish.yml` workflow triggers on tag push. Check:
 - GitHub Actions: workflow should pass (tests + publish)
-- Sonatype Central: artifacts should appear in staging
-- Close and release the staging repository on central.sonatype.com
+- Sonatype Central Portal: artifacts upload automatically via vanniktech maven-publish plugin
+- Verify on central.sonatype.com that the deployment was published
 
 ### 5. Verify on Maven Central
 
